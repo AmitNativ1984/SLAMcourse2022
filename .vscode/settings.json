@@ -1,0 +1,6 @@
+{
+    "git.ignoreLimitWarning": true,
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "terminal.integrated.env.osx": {"PYTHONPATH": "${workspaceFolder}/VAN_ex/code"}
+}

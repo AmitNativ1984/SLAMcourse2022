@@ -1,0 +1,23 @@
+{
+    "image": "amitnativ/slam:opencv-matplotlib",
+    "extensions":   ["streetsidesoftware.code-spell-checker",
+                    "mhutchie.git-graph",
+                    "ms-toolsai.jupyter",
+                    "did1335.opencv-intellisense",
+                    "ms-python.vscode-pylance",
+                    "ms-python.python",
+                    "tomoki1207.pdf",
+                    "streetsidesoftware.code-spell-checker",
+                    "njpwerner.autodocstring",
+                    "mikestead.dotenv",
+                    "kiteco.kite",
+                    
+                ],
+    "runArgs": [
+                "--net", "host",
+                "-e", "DISPLAY=${env:DISPLAY}",
+                "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
+                "-v", "/home/${env:USER}/Dev:/home/Dev"
+    ],
+       
+}
