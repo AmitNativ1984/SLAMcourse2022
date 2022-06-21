@@ -14,22 +14,14 @@
             "env": {"PYTHONPATH": "/workspaces/SLAMcourse/VAN_ex/code"}
         },
         {
-            "name": "ex_1",
+            "name": "ex1",
             "type": "python",
             "request": "launch",
-            "program": "VAN_ex/code/ex_1/main.py",
+            "program": "/workspaces/SLAMcourse2022/VAN_ex/code/ex1.py",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
-            "env": {"PYTHONPATH": "/workspaces/SLAMcourse/VAN_ex/code"}
+    
         },
-        {
-            "name": "ex_2",
-            "type": "python",
-            "request": "launch",
-            "program": "/workspaces/SLAMcourse/VAN_ex/code/ex_2/main.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/VAN_ex/code",
-            "env": {"PYTHONPATH": "/workspaces/SLAMcourse/VAN_ex/code"}
-        },
+        
     ]
 }
