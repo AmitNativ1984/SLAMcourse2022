@@ -18,7 +18,7 @@ if __name__ =='__main__':
     print(des1[:2])
 
     # Match descriptors
-    matches = match_descriptors(des1, des2)
+    matches = match_descriptors_knn(des1, des2, k=2)
     
     ####################################
     # select random indexes of matches
@@ -34,16 +34,8 @@ if __name__ =='__main__':
     # discard matches with segnificance test
     ########################################
     # matches used knn and return 2 best matches for every feature point.
-    ratio_th = 0.7
-    good_matches = []
-    bad_matches = []
-    for m, n in matches:
-        if m.distance < ratio_th * n.distance:
-            good_matches.append(m)
-        else:
-            bad_matches.append(m)
-
-
+    good_matches, bad_matches = filter_matches_by_significance_test(matches, ratio_th=0.7)
+    
     print("Number of good matches: {}".format(len(good_matches)))
     print("Number of discarded matches: {}".format(len(matches) - len(good_matches)))
     significance_test_img = cv2.drawMatches(img1, kp1, img2, kp2, good_matches[:20], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -51,7 +43,7 @@ if __name__ =='__main__':
     plt.imshow(significance_test_img)
 
     # correct match that failed the significance test
-    bad_matches = sorted(bad_matches, key = lambda x:x.distance)
+    bad_matches = sort_matches_by_distance(bad_matches)
     significance_test_false_img = cv2.drawMatches(img1, kp1, img2, kp2, bad_matches[:1], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
     plt.figure("significance test false failure")
     plt.imshow(significance_test_false_img)
