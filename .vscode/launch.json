@@ -5,23 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/VAN_ex/code",
-            "env": {"PYTHONPATH": "/workspaces/SLAMcourse/VAN_ex/code"}
-        },
-        {
             "name": "ex1",
             "type": "python",
             "request": "launch",
             "program": "/workspaces/SLAMcourse2022/VAN_ex/code/ex1.py",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
-    
         },
+        {
+            "name": "ex2",
+            "type": "python",
+            "request": "launch",
+            "program": "/workspaces/SLAMcourse2022/VAN_ex/code/ex2.py",
+            "console": "integratedTerminal",
+            "cwd": "${fileDirname}",
+        }
         
     ]
 }
