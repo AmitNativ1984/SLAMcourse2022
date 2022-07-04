@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from data_utils import *
 from feature_tracking import *
+from triangulation import *
 import random
 
 if __name__ == '__main__':
@@ -9,7 +10,7 @@ if __name__ == '__main__':
     print("*** Start ex2 ***")
     DATA_PATH = "../../VAN_ex/dataset/sequences/00"
     # Read image pair
-    img1, img2 = read_image_pair(DATA_PATH, 0)
+    img1, img2 = read_image_pair(DATA_PATH, 100)
 
     # Detect ORB features and compute descriptors
     kp1, des1 = orb_detect_and_compute(img1)
@@ -65,4 +66,25 @@ if __name__ == '__main__':
    
     print("Probability of match that passes rectified contrained, to be erroneous: {}%".format(len(good_matches_below_significance_level)/len(good_matches)*100))
     print("Total probability of match to pass rectified stereo pair constraint and fail significance test: {}%".format(len(good_matches_below_significance_level)/len(good_matches) * len(good_matches)/len(matches) * 100))
+    
+    ##################################################################
+    # Triangulate 3D points from the matched features
+    ##################################################################
+    K, P, Q = read_cameras(DATA_PATH)
+    X = linear_least_squares_triangulation(K@P, kp1, K@Q, kp2, good_matches)
+    Xopencv = cv2.triangulatePoints(K@P, K@Q, np.array([np.array(kp1[m.queryIdx].pt) for m in good_matches]).transpose(), np.array([np.array(kp2[m.trainIdx].pt) for m in good_matches]).transpose())
+    Xopencv = Xopencv.transpose()   
+    Xopencv = Xopencv / Xopencv[:,3].reshape(-1,1) 
+
+
+    fig = plt.figure("3D points")
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', marker='o', alpha=0.5)
+    ax.scatter(Xopencv[:, 0], Xopencv[:, 1], Xopencv[:, 2], c='b', marker='o', alpha=0.5)
+    ax.set_zlim(min(X[:,2])-1, max(X[:,2])+1)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    
     plt.show()

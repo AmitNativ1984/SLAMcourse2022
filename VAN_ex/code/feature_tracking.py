@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from params import *
 
 def orb_detect_and_compute(img1):
     # Detect ORB features and compute descriptors
@@ -66,3 +67,28 @@ def filter_matches_by_rectified_stereo_pattern_constraint(kp1, kp2, matches, max
             bad_matches.append(m)
     
     return good_matches, bad_matches
+
+def get_consistent_matches_between_successive_frames(kp, good_matches_between_frames, matches_between_pairs):
+    # filter keypoints and matches that match between successive frames and are consistent with image pairs.
+    # Returns: [(match_pair0_0, match_pair1_0), (match_pair0_1, match_pair1_1), (match_pair0_2, match_pair1_2), ...]
+    #           A list of tuples representing the same point in all 4 images
+    
+    consistent_matches = []
+    kp_img_pair_0_left = [kp[FRAME0][LEFT][match.queryIdx] for match in matches_between_pairs[FRAME0]]
+    kp_img_pair_1_left = [kp[FRAME1][LEFT][match.queryIdx] for match in matches_between_pairs[FRAME1]]
+
+    for match in good_matches_between_frames:
+        # get keypoint of left FRAME0:
+        kp_frame0 = kp[FRAME0][LEFT][match.queryIdx]    #return pointer to keypoint
+        # get matching keypoint of left FRAME1:
+        kp_frame1 = kp[FRAME1][LEFT][match.trainIdx]    #return pointer to keypoint
+
+        # check if keypoints are consistent with image pairs:
+        try:
+            left_match = kp_img_pair_0_left.index(kp_frame0)
+            right_match = kp_img_pair_1_left.index(kp_frame1)
+            consistent_matches.append((matches_between_pairs[FRAME0][left_match], matches_between_pairs[FRAME1][right_match]))
+        except Exception:
+            continue
+
+    return consistent_matches
