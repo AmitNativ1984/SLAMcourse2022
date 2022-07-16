@@ -32,3 +32,10 @@ def linear_least_squares_triangulation(P, kp1, Q, kp2, matches):
 def rodriguez_to_mat(rvec, tvec): 
   rot, _ = cv2.Rodrigues(rvec) 
   return np.hstack((rot, tvec))
+
+def transform_point_cloud(X, T):
+    # X: point cloud
+    # T: transformation matrix
+    # return: transformed point cloud
+    X = np.vstack((X, np.ones((1, X.shape[1]))))
+    return T @ X

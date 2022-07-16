@@ -78,7 +78,11 @@ if __name__ == '__main__':
     ############################################################
     print("* PNP of 4 keypoints that were matched on all four images")
     point_clouds = []
+    
     X = linear_least_squares_triangulation(K@P, kp[FRAME0][LEFT], K@Q, kp[FRAME0][RIGHT], good_matches[:,FRAME0]).transpose()
+    point_clouds.append(X[:3, :])
+
+    X = linear_least_squares_triangulation(K@P, kp[FRAME1][LEFT], K@Q, kp[FRAME1][RIGHT], good_matches[:,FRAME1]).transpose()
     point_clouds.append(X[:3, :])
 
     # randomlly select 4 keypoints from the good matches
@@ -121,10 +125,42 @@ if __name__ == '__main__':
     print("* Get supporters of the transform found with PnP")
     R, _ = cv2.Rodrigues(r1)
     T = np.hstack((R, t1))
-    R = rodriguez_to_mat(r1, np.zeros_like(t1))
+    # R = rodriguez_to_mat(r1, np.zeros_like(t1))
     # T = np.hstack((R.transpose(), -R.transpose()@t1))
-    supporters, uv_proj =get_transformation_supporters(K, P, Q, T, kp, good_matches, point_clouds[FRAME0], px_dist=2)
-    print("\t found {} supporters".format(len(supporters)))
+    supporters_idx = get_transformation_supporters(K, P, Q, T, kp, good_matches, point_clouds[FRAME0], px_dist=2)
+    print("\t found {} supporters".format(len(supporters_idx)))
 
+    #############################################################
+    #### Perform full RANSAC to find the best transformation ####
+    #############################################################
+    print("* Perform full RANSAC to find the best transformation")
+    RANSAC_iterations = 100
+    RANSAC_threshold = 2 # in pixels
+
+    T, supporters_idx = Ransac(K, P, Q, kp, good_matches, point_clouds, RANSAC_iterations, RANSAC_threshold)
+                    
+    
+    # transforming world points to point cloud in FRAME1 coordinate systems:
+    X = transform_point_cloud(point_clouds[FRAME0], T)
+
+    fig = plt.figure("Transforming frame 0 point cloud onto frame1")
+    # ax = fig.add_subplot(111, projection='2d')
+    # ax.scatter(point_clouds[FRAME1][0,:], point_clouds[FRAME1][1,:], point_clouds[FRAME1][2,:], c='r', marker='o', alpha=0.5)
+    # ax.scatter(X[0,:], X[1,:], X[2,:], c='b', marker='^', alpha=0.5)
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    ax = fig.add_subplot(111)
+    ax.scatter(point_clouds[FRAME1][0,:], point_clouds[FRAME1][2,:], c='r', marker='o', alpha=0.5, label='frame1')
+    ax.scatter(point_clouds[FRAME0][0,:], point_clouds[FRAME0][2,:], c='g', marker='o', alpha=0.5, label='frame0')
+    ax.scatter(X[0,:], X[2,:], c='b', marker='^', alpha=0.5, label='frame0 transformed')
+    
+    ax.set_xlabel('X')
+    ax.set_xlim([-20, 10])
+    ax.set_ylabel('Z')
+    ax.set_ylim([0, 30])
+    ax.set_aspect('equal')
+    ax.legend()
+    
 plt.show()
     
