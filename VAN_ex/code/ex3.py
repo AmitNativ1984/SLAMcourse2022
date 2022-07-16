@@ -53,6 +53,26 @@ if __name__ == '__main__':
     print("\tWe now have matches of same point between 2 successive stereo pairs")
     print("\n")
 
+    ##############################################################################
+    ####################### Displaying matches between frames ####################
+    ##############################################################################
+    # good mathes: [FRAME0 matches, FRAME1 matches]
+    # matches on first image pair:
+    fig, axes = plt.subplots(2, 1)
+    
+       
+    img1, img2 = read_image_pair(DATA_PATH, 0)
+    frame0_img = cv2.drawMatches(img1, kp[FRAME0][LEFT], img2, kp[FRAME0][RIGHT], good_matches[:5,FRAME0], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    axes.ravel()[0].imshow(frame0_img)
+    
+
+    img3, img4 = read_image_pair(DATA_PATH, 1)
+    frame1_img = cv2.drawMatches(img3, kp[FRAME1][LEFT], img2, kp[FRAME1][RIGHT], good_matches[:5,FRAME1], None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    
+    axes.ravel()[1].imshow(frame1_img)
+    plt.tight_layout()
+
+
     ############################################################
     #  PNP of 4 keypoints that were matched on all four images #
     ############################################################
@@ -64,7 +84,6 @@ if __name__ == '__main__':
     # randomlly select 4 keypoints from the good matches
     random_indices = np.random.choice(len(good_matches), 4, replace=False)
     
-    
     # calculate PnP:
     success, r1, t1 = cv2.solvePnP(objectPoints=np.array([point_clouds[FRAME0][:,i] for i in random_indices]),
                                    imagePoints=np.array([kp[FRAME1][LEFT][good_matches[:, FRAME1][i].queryIdx].pt for i in random_indices]),
@@ -72,7 +91,6 @@ if __name__ == '__main__':
                                    distCoeffs=np.zeros((4,1)),
                                    flags=cv2.SOLVEPNP_P3P)
 
-    
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #   * [R|t] describes the world coordinate system as seen from left1 coordinate system. left1 = R(left0) + t
     #   * The chained transform from camera A to camera B to camera C:
@@ -92,10 +110,21 @@ if __name__ == '__main__':
     pos_left = np.vstack((pos0_left, pos1_left))
     pos_right = np.vstack((pos0_right, pos1_right))
 
-    plt.figure('camera positions in world coordinates')
+    plt.figure('relative camera positions in world coordinates')
     plt.scatter(pos_left[:, 0], pos_left[:, -1], color='r', marker='x', alpha=0.5, label='left camera')
     plt.scatter(pos_right[:, 0], pos_right[:, -1], color='b', marker='o', alpha=0.5, label='right camera')
     plt.legend()
+
+    ####################################################
+    # Get supporters of the transform found with PnP
+    ####################################################
+    print("* Get supporters of the transform found with PnP")
+    R, _ = cv2.Rodrigues(r1)
+    T = np.hstack((R, t1))
+    R = rodriguez_to_mat(r1, np.zeros_like(t1))
+    # T = np.hstack((R.transpose(), -R.transpose()@t1))
+    supporters, uv_proj =get_transformation_supporters(K, P, Q, T, kp, good_matches, point_clouds[FRAME0], px_dist=2)
+    print("\t found {} supporters".format(len(supporters)))
 
 plt.show()
     

@@ -92,3 +92,56 @@ def get_consistent_matches_between_successive_frames(kp, good_matches_between_fr
             continue
 
     return consistent_matches
+
+def get_transformation_supporters(K, P, Q, T, kp, matches, point_cloud, px_dist=2):
+    # return all matches that are supporters of the transformation T
+    # T: the tranformation of the object as seen in the camera coordinate system
+    # kp: keypoints [(kp_frame0_left, kp_frame0_right), (kp_frame1_left, kp_frame1_right)]
+    # matches: matches [(matches_frame0, matches_frame1)]
+    # point_cloud: point cloud
+    # px_dist: maximum distance between projected point to keypoint
+
+    uv_proj = [[[], []], [[], []]]
+    X = np.vstack((point_cloud, np.ones((1, point_cloud.shape[1]))))
+    P = np.vstack((P, np.array([0, 0, 0, 1])))
+    Q = np.vstack((Q, np.array([0, 0, 0, 1])))
+    T = np.vstack((T, np.array([0, 0, 0, 1])))
+    # dimensionality reduction
+    M = np.array([[1,0,0,0],
+                  [0,1,0,0],
+                  [0,0,1,0]])
+    # frame0: left image
+    uv_proj[FRAME0][LEFT] = K @ M @ P @ X
+    # frame0: right image
+    uv_proj[FRAME0][RIGHT] = K @ M @ Q @ X
+    # frame1: left image
+    uv_proj[FRAME1][LEFT] = K @ M @ P @ T @ X
+    # frame1: right image
+    uv_proj[FRAME1][RIGHT] = K @ M @ Q @ T @ X
+
+    # normalizing uv_proj in homogeneous coordinates to get pixels:
+    uv_proj[FRAME0][LEFT] = (uv_proj[FRAME0][LEFT][:2, :] / uv_proj[FRAME0][LEFT][2, :]).transpose()
+    uv_proj[FRAME0][RIGHT] = (uv_proj[FRAME0][RIGHT][:2, :] / uv_proj[FRAME0][RIGHT][2, :]).transpose()
+    uv_proj[FRAME1][LEFT] = (uv_proj[FRAME1][LEFT][:2, :] / uv_proj[FRAME1][LEFT][2, :]).transpose()
+    uv_proj[FRAME1][RIGHT] = (uv_proj[FRAME1][RIGHT][:2, :] / uv_proj[FRAME1][RIGHT][2, :]).transpose()
+    
+    uv = [[[], []], [[], []]]
+    for match in matches:
+        uv[FRAME0][LEFT].append(kp[FRAME0][LEFT][match[FRAME0].queryIdx].pt)
+        uv[FRAME0][RIGHT].append(kp[FRAME0][RIGHT][match[FRAME0].trainIdx].pt)
+
+        uv[FRAME1][LEFT].append(kp[FRAME1][LEFT][match[FRAME1].queryIdx].pt)
+        uv[FRAME1][RIGHT].append(kp[FRAME1][RIGHT][match[FRAME1].trainIdx].pt)
+
+    # calculate distance:
+    supporters = []
+    for idx in range(len(uv[FRAME0][LEFT])):
+        d1 = np.linalg.norm(uv_proj[FRAME0][LEFT][idx] - uv[FRAME0][LEFT][idx])
+        d2 = np.linalg.norm(uv_proj[FRAME0][RIGHT][idx] - uv[FRAME0][RIGHT][idx])
+        d3 = np.linalg.norm(uv_proj[FRAME1][LEFT][idx] - uv[FRAME1][LEFT][idx])
+        d4 = np.linalg.norm(uv_proj[FRAME1][RIGHT][idx] - uv[FRAME1][RIGHT][idx])
+        if d1 <= px_dist and d2 <= px_dist and d3 <= px_dist and d4 <= px_dist:
+            supporters.append(matches[idx])            
+    
+    return supporters, uv_proj
+
