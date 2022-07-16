@@ -11,6 +11,7 @@
                     "njpwerner.autodocstring",
                     "mikestead.dotenv",
                     "kiteco.kite",
+                    "GitHub.copilot"
                     
                 ],
     "runArgs": [
