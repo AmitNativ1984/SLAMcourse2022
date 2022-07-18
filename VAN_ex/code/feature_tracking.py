@@ -146,13 +146,13 @@ def get_transformation_supporters(K, P, Q, T, kp, matches, point_cloud, px_dist=
     
     return supporters
 
-def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_thershold=2):
+def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_thershold=2, num_random_choices=4):
     
     max_num_supporters = 0
     best_supporters_idx = []
     for i in range(RANSAC_iterations):
         # randomlly select 4 keypoints from the good matches
-        random_indices = np.random.choice(len(matches), 4, replace=False)
+        random_indices = np.random.choice(len(matches), num_random_choices, replace=False)
         
         # calculate PnP:
         success, r1, t1 = cv2.solvePnP(objectPoints=np.array([point_clouds[FRAME0][:,i] for i in random_indices]),
@@ -170,8 +170,7 @@ def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_th
         T = np.hstack((R, t1))
         supporters_idx = get_transformation_supporters(K, P, Q, T, kp, matches, point_clouds[FRAME0], px_dist=RANSAC_thershold)
         if len(supporters_idx) > max_num_supporters:
-            print("found new best PnP transformation")
-            print("number of supporters: ", len(supporters_idx))
+            print("found new best PnP transformation with {} supporters".format(len(supporters_idx)))
             max_num_supporters = len(supporters_idx)
             best_supporters_idx = supporters_idx
             best_T = T
@@ -180,7 +179,7 @@ def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_th
     # This is done with iterative PnP on the supporters with thre previous transformation as initial guess
     # It actually performs DLT with the supporters to find the transformation
     if len(best_supporters_idx) < 6:
-        raise("Not enough supporters found: %d", len(best_supporters_idx))
+        raise ValueError("Not enough supporters found: {}".format(len(best_supporters_idx)))
     
     success, r1, t1 = cv2.solvePnP(objectPoints=np.array([point_clouds[FRAME0][:,i] for i in best_supporters_idx]),
                                     imagePoints=np.array([kp[FRAME1][LEFT][matches[:, FRAME1][i].queryIdx].pt for i in best_supporters_idx]),

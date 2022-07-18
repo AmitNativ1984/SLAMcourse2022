@@ -6,16 +6,14 @@ from feature_tracking import *
 from triangulation import *
 from params import *
 
-if __name__ == '__main__':
-    print("\n")
-    print("*** Start ex3 ***")
+def first_two_frames():
     K, P, Q = read_cameras(DATA_PATH)
     des = []
     kp = []
     matches_between_pairs = []
     point_clouds = []
     max_pix_deviation = 2 #  from rectified stereo pattern
-    for i in range(2):
+    for i in range(2,4):
         print("* Processing image {}".format(i))
         img1, img2 = read_image_pair(DATA_PATH, i)
         kp1, des1 = orb_detect_and_compute(img1)
@@ -85,7 +83,7 @@ if __name__ == '__main__':
     X = linear_least_squares_triangulation(K@P, kp[FRAME1][LEFT], K@Q, kp[FRAME1][RIGHT], good_matches[:,FRAME1]).transpose()
     point_clouds.append(X[:3, :])
 
-    # randomlly select 4 keypoints from the good matches
+    # randomlly select 4 keypoints from the goo7d matches
     random_indices = np.random.choice(len(good_matches), 4, replace=False)
     
     # calculate PnP:
@@ -161,6 +159,89 @@ if __name__ == '__main__':
     ax.set_ylim([0, 30])
     ax.set_aspect('equal')
     ax.legend()
+
+    return
+
+if __name__ == '__main__':
+    print("\n")
+    print("*** Start ex3 ***")
     
+    # example of steps performed only on first two frames:
+    first_two_frames()
+
+    ########################################################
+    ####  FINDING CAMERA POSITION OVER ENTIRE DATA SET #####
+    ########################################################
+    print("* FINDING CAMERA POSITION OVER ENTIRE DATA SET")
+    num_images = 10
+    # collect keypoints, descriptors and matches for all image pairs:
+    K, P, Q = read_cameras(DATA_PATH)
+    des = []
+    kp = []
+    matches_between_pairs = []
+    max_pix_deviation = 2 #  from rectified stereo pattern
+    print("* Start collecting keypoints, descriptors and matches for all image pairs")
+    for i in range(num_images):
+        print("\t Collecting keypoints from image pair: {}".format(i))
+        img1, img2 = read_image_pair(DATA_PATH, i)
+        kp1, des1 = orb_detect_and_compute(img1)
+        kp2, des2 = orb_detect_and_compute(img2)
+        # match descriptors
+        curent_pair_matches = [m[0] for m in match_descriptors_knn(des1, des2, k=2)]
+        good_matches, bad_matches = filter_matches_by_rectified_stereo_pattern_constraint(kp1, kp2, curent_pair_matches, max_rect_deviation=max_pix_deviation)
+        
+        kp.append((kp1, kp2))
+        des.append((des1, des2))
+        matches_between_pairs.append((good_matches))
+
+    print("* Finished collecting image pairs")
+    print("\n")
+
+    print("* Start finding consistent matches between successive frames")
+    good_matches = []
+    T = []
+    point_clouds = []
+
+    RANSAC_iterations = 100
+    RANSAC_threshold = 2 # in pixels
+    print("* Matching key points of successive left images")
+    for i in range(num_images-1):
+        Frame0 = i
+        Frame1 = i+1
+        
+        matches_frame0_frame1 = match_descriptors_knn(des[Frame0][LEFT], des[Frame1][LEFT], k=2)
+        good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.7)
+
+        # filter keypoints that are matched between left-right pairs and between frames:
+        curr_good_matches = get_consistent_matches_between_successive_frames(kp, 
+                                                                        good_matches_between_frames,
+                                                                        matches_between_pairs[Frame0:Frame1+1])
+
+        good_matches.append(np.array(curr_good_matches))
+
+        X1 = linear_least_squares_triangulation(K@P, kp[Frame0][LEFT], K@Q, kp[Frame0][RIGHT], good_matches[-1][:,FRAME0]).transpose()
+        X2 = linear_least_squares_triangulation(K@P, kp[Frame1][LEFT], K@Q, kp[Frame1][RIGHT], good_matches[-1][:,FRAME1]).transpose()
+        point_clouds.append((X1[:3, :], X2[:3, :]))
+
+        print("\n")
+        print(i)
+        print(" Perform RANSAC to find the tranformation from world coordinates Xw to camera coordinates Xc")
+        try:
+            curr_T, supporters_idx = Ransac(K, P, Q, kp[Frame0:Frame1+1], good_matches[-1], point_clouds[-1], RANSAC_iterations, RANSAC_threshold)
+            T.append(curr_T)
+        except Exception as e:
+            print(e)
+        except ValueError as e:
+            print(e)
+
+        
+
+        
+
+
+        
+
 plt.show()
+
+
     
