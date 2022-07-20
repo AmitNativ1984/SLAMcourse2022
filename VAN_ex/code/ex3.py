@@ -5,6 +5,10 @@ from data_utils import *
 from feature_tracking import *
 from triangulation import *
 from params import *
+import time
+import logging
+logging.basicConfig(format='%(asctime)s [%(name)s] [%(funcName)s] [%(levelname)s] %(message)s', datefmt='%m/%d/%Y %I:%M:%S ', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def first_two_frames():
     K, P, Q = read_cameras(DATA_PATH)
@@ -13,8 +17,8 @@ def first_two_frames():
     matches_between_pairs = []
     point_clouds = []
     max_pix_deviation = 2 #  from rectified stereo pattern
-    for i in range(2,4):
-        print("* Processing image {}".format(i))
+    for i in range(2):
+        logger.info("* Processing image {}".format(i))
         img1, img2 = read_image_pair(DATA_PATH, i)
         kp1, des1 = orb_detect_and_compute(img1)
         kp2, des2 = orb_detect_and_compute(img2)
@@ -27,7 +31,7 @@ def first_two_frames():
         des.append((des1, des2))
         matches_between_pairs.append((good_matches))
         point_clouds.append((X))
-        print("\tFinished processing key points, descriptors and matches for image {}".format(i))
+        logger.info("\tFinished processing key points, descriptors and matches for image {}".format(i))
 
         fig = plt.figure("3D points pair {}".format(i))
         ax = fig.add_subplot(111, projection='3d')
@@ -36,8 +40,8 @@ def first_two_frames():
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
 
-    print("\n")
-    print("* Matching key points of successive left images")
+    logger.info("\n")
+    logger.info("* Matching key points of successive left images")
     matches_frame0_frame1 = match_descriptors_knn(des[FRAME0][LEFT], des[FRAME1][LEFT], k=2)
     good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.7)
 
@@ -47,9 +51,9 @@ def first_two_frames():
                                                                     matches_between_pairs)
 
     good_matches = np.array(good_matches)
-    print("\tFinished matching key points of successive left images")
-    print("\tWe now have matches of same point between 2 successive stereo pairs")
-    print("\n")
+    logger.info("\tFinished matching key points of successive left images")
+    logger.info("\tWe now have matches of same point between 2 successive stereo pairs")
+    logger.info("\n")
 
     ##############################################################################
     ####################### Displaying matches between frames ####################
@@ -74,7 +78,7 @@ def first_two_frames():
     ############################################################
     #  PNP of 4 keypoints that were matched on all four images #
     ############################################################
-    print("* PNP of 4 keypoints that were matched on all four images")
+    logger.info("* PNP of 4 keypoints that were matched on all four images")
     point_clouds = []
     
     X = linear_least_squares_triangulation(K@P, kp[FRAME0][LEFT], K@Q, kp[FRAME0][RIGHT], good_matches[:,FRAME0]).transpose()
@@ -92,7 +96,8 @@ def first_two_frames():
                                    cameraMatrix=K,
                                    distCoeffs=np.zeros((4,1)),
                                    flags=cv2.SOLVEPNP_P3P)
-
+    R, _ = cv2.Rodrigues(r1)
+    trans = -R.transpose() @ t1
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #   * [R|t] describes the world coordinate system as seen from left1 coordinate system. left1 = R(left0) + t
     #   * The chained transform from camera A to camera B to camera C:
@@ -106,8 +111,8 @@ def first_two_frames():
     pos0_left = np.array([[0, 0, 0]])
     pos0_right = pos0_left - Q[:,-1]
 
-    pos1_left = pos0_left + t1.transpose()
-    pos1_right = pos0_right + t1.transpose()
+    pos1_left = pos0_left + trans.transpose()
+    pos1_right = pos0_right + trans.transpose()
 
     pos_left = np.vstack((pos0_left, pos1_left))
     pos_right = np.vstack((pos0_right, pos1_right))
@@ -115,23 +120,24 @@ def first_two_frames():
     plt.figure('relative camera positions in world coordinates')
     plt.scatter(pos_left[:, 0], pos_left[:, -1], color='r', marker='x', alpha=0.5, label='left camera')
     plt.scatter(pos_right[:, 0], pos_right[:, -1], color='b', marker='o', alpha=0.5, label='right camera')
+    plt.xlabel('x[m]')
+    plt.ylabel('z[m]')
     plt.legend()
 
     ####################################################
     # Get supporters of the transform found with PnP
     ####################################################
-    print("* Get supporters of the transform found with PnP")
-    R, _ = cv2.Rodrigues(r1)
+    logger.info("* Get supporters of the transform found with PnP")
     T = np.hstack((R, t1))
     # R = rodriguez_to_mat(r1, np.zeros_like(t1))
     # T = np.hstack((R.transpose(), -R.transpose()@t1))
     supporters_idx = get_transformation_supporters(K, P, Q, T, kp, good_matches, point_clouds[FRAME0], px_dist=2)
-    print("\t found {} supporters".format(len(supporters_idx)))
+    logger.info("\t found {} supporters".format(len(supporters_idx)))
 
     #############################################################
     #### Perform full RANSAC to find the best transformation ####
     #############################################################
-    print("* Perform full RANSAC to find the best transformation")
+    logger.info("* Perform full RANSAC to find the best transformation")
     RANSAC_iterations = 100
     RANSAC_threshold = 2 # in pixels
 
@@ -163,8 +169,13 @@ def first_two_frames():
     return
 
 if __name__ == '__main__':
-    print("\n")
-    print("*** Start ex3 ***")
+    logger.info("\n")
+    logger.info("*** Start ex3 ***")
+
+    K, P, Q = read_cameras(DATA_PATH)
+    ground_truth_poses = read_ground_truth_camera_pose(DATA_PATH)
+    
+    NUM_IMAGES = len(ground_truth_poses)
     
     # example of steps performed only on first two frames:
     first_two_frames()
@@ -172,17 +183,16 @@ if __name__ == '__main__':
     ########################################################
     ####  FINDING CAMERA POSITION OVER ENTIRE DATA SET #####
     ########################################################
-    print("* FINDING CAMERA POSITION OVER ENTIRE DATA SET")
-    num_images = 10
+    logger.info("* FINDING CAMERA POSITION OVER ENTIRE DATA SET")
     # collect keypoints, descriptors and matches for all image pairs:
-    K, P, Q = read_cameras(DATA_PATH)
+    
     des = []
     kp = []
     matches_between_pairs = []
     max_pix_deviation = 2 #  from rectified stereo pattern
-    print("* Start collecting keypoints, descriptors and matches for all image pairs")
-    for i in range(num_images):
-        print("\t Collecting keypoints from image pair: {}".format(i))
+    logger.info("* Start collecting keypoints, descriptors and matches for all image pairs")  
+    for i in range(NUM_IMAGES):
+        logger.info("\t Collecting keypoints from image pair: {}".format(i))
         img1, img2 = read_image_pair(DATA_PATH, i)
         kp1, des1 = orb_detect_and_compute(img1)
         kp2, des2 = orb_detect_and_compute(img2)
@@ -194,23 +204,24 @@ if __name__ == '__main__':
         des.append((des1, des2))
         matches_between_pairs.append((good_matches))
 
-    print("* Finished collecting image pairs")
-    print("\n")
-
-    print("* Start finding consistent matches between successive frames")
+    logger.info("* Finished collecting image pairs")
+    logger.info("* Start finding consistent matches between successive frames")
     good_matches = []
-    T = []
     point_clouds = []
-
+ 
+    T_all = [np.eye(4)]
+    left_cam_poses = [np.eye(4)]
     RANSAC_iterations = 100
     RANSAC_threshold = 2 # in pixels
-    print("* Matching key points of successive left images")
-    for i in range(num_images-1):
+
+    logger.info("* Matching key points of successive left images")
+    start_time = time.time()
+    for i in range(NUM_IMAGES-1):
         Frame0 = i
         Frame1 = i+1
         
         matches_frame0_frame1 = match_descriptors_knn(des[Frame0][LEFT], des[Frame1][LEFT], k=2)
-        good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.7)
+        good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.8)
 
         # filter keypoints that are matched between left-right pairs and between frames:
         curr_good_matches = get_consistent_matches_between_successive_frames(kp, 
@@ -223,23 +234,43 @@ if __name__ == '__main__':
         X2 = linear_least_squares_triangulation(K@P, kp[Frame1][LEFT], K@Q, kp[Frame1][RIGHT], good_matches[-1][:,FRAME1]).transpose()
         point_clouds.append((X1[:3, :], X2[:3, :]))
 
-        print("\n")
-        print(i)
-        print(" Perform RANSAC to find the tranformation from world coordinates Xw to camera coordinates Xc")
+        logger.info("Frames: {}-{}".format(Frame0, Frame1))
+        logger.info("Finding transsformation from frame {} coordinates: Running RANSAC".format(Frame0))
         try:
-            curr_T, supporters_idx = Ransac(K, P, Q, kp[Frame0:Frame1+1], good_matches[-1], point_clouds[-1], RANSAC_iterations, RANSAC_threshold)
-            T.append(curr_T)
+            T, supporters_idx = Ransac(K, P, Q, kp[Frame0:Frame1+1], good_matches[-1], point_clouds[-1], RANSAC_iterations, RANSAC_threshold)
+            logger.info("Ransac result: {}".format(T))
+            T = np.vstack((T, np.array([0,0,0,1])))
+            T_all.append(T_all[-1] @ T)
+                        
+            left_pose = get_camera_pose(T_all[-1])
+            left_cam_poses.append(np.vstack((left_pose,np.array([0,0,0,1]))))
+            dt = np.linalg.norm(left_cam_poses[Frame1] - left_cam_poses[Frame1-1])
+            
         except Exception as e:
-            print(e)
+            logger.info(e)
         except ValueError as e:
-            print(e)
+            logger.info(e)
 
-        
+    end_time = time.time()
+    logger.info("*** COLLECTED {} CAMERA EXTRINSIC TRANSFORMS ***".format(len(T_all)))
+    
+    total_exec_time = end_time - start_time
+    min, sec = divmod(total_exec_time, 60)
+    logger.info("*** TOTAL ELAPSED TIME: %d[min] %.3f[sec]",int(min), sec)
 
-        
+    
+    xz_estimated = np.array([(pose[0,-1], pose[2,-1]) for pose in left_cam_poses[:NUM_IMAGES]])
+    xz_gt = np.array([(pose[0,-1], pose[2,-1]) for pose in ground_truth_poses[:NUM_IMAGES]])
 
-
-        
+    plt.figure('left camera trajectory ')
+    plt.scatter(xz_estimated[:,0], xz_estimated[:,1], color='r', marker='x', alpha=0.5, label='left camera')
+    plt.scatter(xz_gt[:,0], -xz_gt[:,1], color='b', marker='o', alpha=0.5, label='ground_truth')
+    plt.xlabel('x[m]')
+    plt.ylabel('z[m]')
+    plt.legend()
+    
+    os.makedirs("../outputs/ex3", exist_ok=True)
+    plt.savefig('../outputs/ex3/left_cam_trajectory.png')
 
 plt.show()
 

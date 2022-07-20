@@ -2,18 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "x11 forwarding on attach to container",
-            "type": "shell",
-            "command": "xhost +",
-            "presentation": {
-                "reveal": "always",
-                "panel": "new"
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
-            }
-        },
-        {
             "label": "set PYTHONPATH",
             "type": "shell",
             "command": "export PYTHONPATH=.",

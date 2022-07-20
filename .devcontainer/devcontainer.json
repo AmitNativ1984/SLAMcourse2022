@@ -20,5 +20,6 @@
                 "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
                 "-v", "/home/${env:USER}/Dev:/home/Dev"
     ],
+    "initializeCommand": "xhost +local:root"
        
 }

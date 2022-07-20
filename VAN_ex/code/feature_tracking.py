@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from params import *
+import logging
+logger = logging.getLogger(__name__)
 
 def orb_detect_and_compute(img1):
     # Detect ORB features and compute descriptors
@@ -147,7 +149,9 @@ def get_transformation_supporters(K, P, Q, T, kp, matches, point_cloud, px_dist=
     return supporters
 
 def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_thershold=2, num_random_choices=4):
-    
+    # returns PnP tranform with RANSAC as inner kernel.
+    # the ouput transform describes world coordinates as seen in camera 2 coordinate system
+    # To get camera 2 pos the result need to be [R'|-R't]
     max_num_supporters = 0
     best_supporters_idx = []
     for i in range(RANSAC_iterations):
@@ -170,10 +174,12 @@ def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_th
         T = np.hstack((R, t1))
         supporters_idx = get_transformation_supporters(K, P, Q, T, kp, matches, point_clouds[FRAME0], px_dist=RANSAC_thershold)
         if len(supporters_idx) > max_num_supporters:
-            print("found new best PnP transformation with {} supporters".format(len(supporters_idx)))
+            logger.info("found new best PnP transformation with {} supporters".format(len(supporters_idx)))
             max_num_supporters = len(supporters_idx)
             best_supporters_idx = supporters_idx
             best_T = T
+            best_r1 = r1
+            best_t1 = t1
 
     # Refine the transformation with the best supporters
     # This is done with iterative PnP on the supporters with thre previous transformation as initial guess
@@ -185,9 +191,21 @@ def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_th
                                     imagePoints=np.array([kp[FRAME1][LEFT][matches[:, FRAME1][i].queryIdx].pt for i in best_supporters_idx]),
                                     cameraMatrix=K,
                                     distCoeffs=np.zeros((4,1)),
-                                    flags=cv2.SOLVEPNP_ITERATIVE)
+                                    rvec= best_r1,
+                                    tvec= best_t1,
+                                    flags=cv2.SOLVEPNP_ITERATIVE,
+                                    useExtrinsicGuess=True)
                                 
                                 
     R, _ = cv2.Rodrigues(r1)
     T = np.hstack((R, t1))
     return T, supporters_idx
+
+def get_camera_pose(T):
+    # T: projection matrix from PnP (tranforms world coordinates to camera coordinates)
+    # returns the camera rotation and position in world coordinates: [R'|-R't]
+    
+    R = T[:3, :3]
+    t = (T[:3, 3]).reshape(-1,1)
+
+    return np.hstack((R.transpose(), -R.transpose()@t))

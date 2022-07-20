@@ -22,3 +22,13 @@ def read_cameras(data_path):
     m1 = np.linalg.inv(k) @ m1
     m2 = np.linalg.inv(k) @ m2
     return k, m1, m2
+
+def read_ground_truth_camera_pose(data_path):
+    poses_data_path = data_path.replace("sequences", "poses") + ".txt"
+    poses = []
+    with open(poses_data_path, 'r') as f:
+        for line in f:
+            pose_txt = line.strip().split(' ')
+            pose = np.array([pose_txt]).astype(np.float).reshape(3,4)
+            poses.append(pose)
+    return poses
