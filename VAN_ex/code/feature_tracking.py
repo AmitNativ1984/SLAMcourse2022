@@ -87,9 +87,9 @@ def get_consistent_matches_between_successive_frames(kp, good_matches_between_fr
 
         # check if keypoints are consistent with image pairs:
         try:
-            left_match = kp_img_pair_0_left.index(kp_frame0)
-            right_match = kp_img_pair_1_left.index(kp_frame1)
-            consistent_matches.append((matches_between_pairs[FRAME0][left_match], matches_between_pairs[FRAME1][right_match]))
+            left_match_0 = kp_img_pair_0_left.index(kp_frame0)
+            left_match_1 = kp_img_pair_1_left.index(kp_frame1)
+            consistent_matches.append((matches_between_pairs[FRAME0][left_match_0], matches_between_pairs[FRAME1][left_match_1]))
         except Exception:
             continue
 
