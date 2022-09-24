@@ -70,7 +70,7 @@ def filter_matches_by_rectified_stereo_pattern_constraint(kp1, kp2, matches, max
     
     return good_matches, bad_matches
 
-def get_consistent_matches_between_successive_frames(kp, good_matches_between_frames, matches_between_pairs):
+def consistent_matches_between_successive_frames(kp, good_matches_between_frames, matches_between_pairs):
     # filter keypoints and matches that match between successive frames and are consistent with image pairs.
     # Returns: [(match_pair0_0, match_pair1_0), (match_pair0_1, match_pair1_1), (match_pair0_2, match_pair1_2), ...]
     #           A list of tuples representing the same point in all 4 images
