@@ -2,7 +2,7 @@ from cProfile import label
 import cv2
 import numpy as np
 from data_utils import *
-from feature_tracking import *
+from tracking.feature_tracking import *
 from triangulation import *
 from params import *
 import time
@@ -46,7 +46,7 @@ def first_two_frames():
     good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.7)
 
     # filter keypoints that are matched between left-right pairs and between frames:
-    good_matches = get_consistent_matches_between_successive_frames(kp, 
+    good_matches = consistent_matches_between_successive_frames(kp, 
                                                                     good_matches_between_frames,
                                                                     matches_between_pairs)
 
@@ -224,7 +224,7 @@ if __name__ == '__main__':
         good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.8)
 
         # filter keypoints that are matched between left-right pairs and between frames:
-        curr_good_matches = get_consistent_matches_between_successive_frames(kp, 
+        curr_good_matches = consistent_matches_between_successive_frames(kp, 
                                                                         good_matches_between_frames,
                                                                         matches_between_pairs[Frame0:Frame1+1])
 

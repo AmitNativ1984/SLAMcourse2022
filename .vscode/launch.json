@@ -27,6 +27,15 @@
             "program": "/workspaces/SLAMcourse2022/VAN_ex/code/ex3.py",
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
+        },
+        {
+            "name": "ex4",
+            "type": "python",
+            "request": "launch",
+            "program": "/workspaces/SLAMcourse2022/VAN_ex/code/ex4.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/VAN_ex/code"
+            // "preLaunchTask": "set PYTHONPATH"
         }
         
     ]
