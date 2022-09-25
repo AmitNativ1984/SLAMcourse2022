@@ -16,10 +16,12 @@ class Tracker():
 
     def __init__(self) -> None:
         self._next_track_id = 0
-        self._next_frame_id = 0
+        
+        # create sparse dataframe for all dataset - starting from two empty, sparse frames
+        self.database = pd.DataFrame(pd.Series())
+        self.spdtype = self.database.dtypes[0]
 
-        # create sparse dataframe for all dataset
-        self.database = pd.DataFrame(pd.Series().astype(pd.SparseDtype("float", np.nan)))
+        self.last_frame_id = 0
 
     def add_frame_pair(self, kpts, matches_between_frames):
         """Update tracker with new frame
@@ -38,6 +40,9 @@ class Tracker():
             #                       kp[i] = [(kp_left_img, kpt_right_img)]
         """
 
+        # adding a new frame to database:
+        self.database[self.last_frame_id+1] = self.spdtype
+        
         # convert incoming frames to pandas series with each item [tack_id,frame_id] = ((u,v)_left, (u,v)_right)
         incoming_pixels_DF = self.convert_matches_to_DataFrame(kpts, matches_between_frames)
         
@@ -45,12 +50,16 @@ class Tracker():
         #TODO: DONT FORGET TO HANDLE FRAMES CORRECTLY!!!!!!
 
         # TODO: UPDATE FRAME0 & FRAME1
+        unmatched_pixels_DF = self.match(incoming_pixels_DF)
+
+        # create new tracks for unmatched tracks        
+        incoming_frame_ids = list(range(self.last_frame_id, self.last_frame_id + 2))
+        self.database[incoming_frame_ids] = self.database[incoming_frame_ids]
+        self.database[self._next_track_id] = unmatched_pixels_DF[FRAME0]
+        self.database[self._next_track_id+1] = unmatched_pixels_DF[FRAME1]
         
-        matched_tracks_idx, unmatched_tracks_idx = self.match(incoming_pixels_DF)
-
-        # create new tracks for unmatched tracks
-        # self.update_database_with_unmatched_tracks(matches_between_frames, kpts, unmatched_tracks_idx)
-
+        self.last_frame_id += 1
+        self._next_track_id = self.database.shape[0]
 
     def convert_matches_to_DataFrame(self, kpts, matches_between_frames):
         # frame0_ktps_pixels = pd.Series().astype(pd.SparseDtype("float", np.nan))
@@ -73,32 +82,8 @@ class Tracker():
         incoming_kpt_pixels[0] = pd.Series(pd.arrays.SparseArray(frame0_ktps_pixels))
         incoming_kpt_pixels[1] = pd.Series(pd.arrays.SparseArray(frame1_kpts_pixels))
         return incoming_kpt_pixels
-    
-    def update_databease_with_matched_tracks(self, matches_between_frames):
-        pass
 
-    def update_database_with_unmatched_tracks(self, matches_between_frames, kpts, unmatched_tracks_idx):
-        # update unmatched kpts as new tracks:
-        new_tracks_frame0 = []
-        new_tracks_frame1 = []
-        for match in matches_between_frames[unmatched_tracks_idx]:
-            # new tracks on FRAME0
-            kp_left_frame0 = kpts[FRAME0][LEFT][match[FRAME0].queryIdx]
-            kp_right_frame0 =  kpts[FRAME0][RIGHT][match[FRAME0].trainIdx]
-            new_tracks_frame0.append((kp_left_frame0, kp_right_frame0))
-
-            # new track on FRAME1
-            kp_left_frame1 = kpts[FRAME1][LEFT][match[FRAME0].queryIdx]
-            kp_right_frame1 = kpts[FRAME0][RIGHT][match[FRAME0].trainIdx]
-            new_tracks_frame1.append((kp_left_frame1, kp_right_frame1))
-
-        self.database[self._next_frame_id] = pd.Series(pd.arrays.SparseArray(new_tracks_frame0))
-        self.database[self._next_frame_id+1] = pd.Series(pd.arrays.SparseArray(new_tracks_frame1))
-        
-        self._next_frame_id += 2
-        self._next_track_id += len(unmatched_tracks_idx)
-
-    def match(self, incoming_pixels_DF):
+    def match(self, unmatched_pixels_DF):
         """Match new frame with tracks in previous recorded frame in data base.
             check kpts ids!!
 
@@ -113,24 +98,28 @@ class Tracker():
         
 
         # A match happens when a first frame in the new match frame pair, matches the same point in the last frame in the database
-        active_tracks = self.database.iloc[:, -1].notna()
+        active_tracks_ids = self.database[self.database.iloc[:, self.last_frame_id].notna()][1].index
 
         # Iterate over all active tracks from the last frame. 
         # Match them with the first frame in the new match frame pair (that is the same kpts that where active in prev frame pair, and also 
         # in the current frame pair)
-        for track_id in active_tracks.index.to_list():
-            track_pixels = self.database.iloc[track_id, -1][LEFT]
+        for track_id in active_tracks_ids.to_list():
+            track_pixels = self.database.iloc[track_id, self.last_frame_id][LEFT]
             # find if same pixels exits in the new frame pair:
-            matched_idx = incoming_pixels_DF[0].apply(lambda x: x[LEFT] == track_pixels).to_list()
-            self.database.iloc[self._next_frame_id + 1, track_id] = incoming_pixels_DF[FRAME1][matched_idx]
+            matched_pixels_mask = unmatched_pixels_DF[FRAME0].apply(lambda x: np.all(np.array(np.array(x) == np.array(track_pixels))[LEFT])).to_list()
+            
+            # update track_id in next frame, with the new pixels
+            matched_pixels_idx = np.where(matched_pixels_mask)
+            if matched_pixels_idx[0].size == 0:
+                continue
+            
+            matched_pixels_idx = matched_pixels_idx[0][0]
+            self.database.iloc[track_id,self.last_frame_id + 1] = unmatched_pixels_DF[FRAME1][matched_pixels_idx]
 
-            # drop the matched index from the incoming_pixels_DF
-            incoming_pixels_DF.drop(incoming_pixels_DF.index[matched_idx], inplace=True, axis=0)
+            # drop the matched index from the unmatched_pixels_DF
+            unmatched_pixels_DF.drop(unmatched_pixels_DF.index[matched_track_idx], inplace=True, axis=0)
 
-        # TODO: update with correct flow
-
-        unmatched_idx = list(range(len(incoming_pixels_DF)))
-
-        return [], unmatched_idx
+        # The remaining rows in incoming_pixels_DF are unmatched tracks:
+        return unmatched_pixels_DF
 
         
