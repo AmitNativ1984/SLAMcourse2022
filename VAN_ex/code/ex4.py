@@ -23,14 +23,14 @@ if __name__ == '__main__':
     # Load data
     ground_truth_poses = read_ground_truth_camera_pose(DATA_PATH)
     NUM_IMAGES = len(ground_truth_poses)
-
+    logger.info("Number of images: {}".format(NUM_IMAGES))
     logger.info(" Collecting data...")
     des = []
     kp = []
     matches_between_pairs = []
     max_pix_deviation = 2 #  from rectified stereo pattern
     matches_between_frames = []
-    for currFrame in range(10):
+    for currFrame in range(NUM_IMAGES):
         logger.info("Collecting keypoints from frame {}".format(currFrame))
         img1, img2 = read_image_pair(DATA_PATH, currFrame)
         kp1, des1 = orb_detect_and_compute(img1)
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         matches_curr_frames, _ = filter_matches_by_significance_test(matches_prevFrame_currFrame, ratio_th=0.8)
         logger.info(f"Found {len(matches_curr_frames)} matches between frame #{prevFrame} and frame #{currFrame}")
 
-        # filter keypoints that are matched between left-right pairs and between frames:
+        # filter keypoints that are matched between that are consistant between left-right pairs, and between successive frames
         matches_between_frames.append(np.array(consistent_matches_between_successive_frames(kp, 
                                                                                             matches_curr_frames,
                                                                                             matches_between_pairs[prevFrame:currFrame+1])))
@@ -68,3 +68,8 @@ if __name__ == '__main__':
         #                       kp[i] = [(kp_left_img, kpt_right_img)]
         tracker.add_frame_pair(kp[-2:], matches_between_frames[-1])
     
+    # save data
+    logger.info("Saving data...")
+     # serlialize database to pickle:   
+    os.makedirs('../outputs/ex4', exist_ok=True)
+    tracker.database.to_pickle('../outputs/ex4/landmarksSparse.pkl')

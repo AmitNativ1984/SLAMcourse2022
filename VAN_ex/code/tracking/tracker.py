@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 from params import *
 
 
@@ -18,7 +19,7 @@ class Tracker():
         self._next_track_id = 0
         
         # create sparse dataframe for all dataset - starting from two empty, sparse frames
-        self.database = pd.DataFrame(pd.Series())
+        self.database = pd.DataFrame(pd.Series([], dtype='object'))
         self.spdtype = self.database.dtypes[0]
 
         self.last_frame_id = 0
@@ -41,22 +42,14 @@ class Tracker():
         """
 
         # adding a new frame to database:
-        self.database[self.last_frame_id+1] = self.spdtype
+        self.database[self.last_frame_id+1] = np.nan
         
         # convert incoming frames to pandas series with each item [tack_id,frame_id] = ((u,v)_left, (u,v)_right)
         incoming_pixels_DF = self.convert_matches_to_DataFrame(kpts, matches_between_frames)
-        
-        
-        #TODO: DONT FORGET TO HANDLE FRAMES CORRECTLY!!!!!!
-
-        # TODO: UPDATE FRAME0 & FRAME1
+       
+        # 
         unmatched_pixels_DF = self.match(incoming_pixels_DF)
-
-        # create new tracks for unmatched tracks        
-        incoming_frame_ids = list(range(self.last_frame_id, self.last_frame_id + 2))
-        self.database[incoming_frame_ids] = self.database[incoming_frame_ids]
-        self.database[self._next_track_id] = unmatched_pixels_DF[FRAME0]
-        self.database[self._next_track_id+1] = unmatched_pixels_DF[FRAME1]
+        self.initiate_new_tracks(unmatched_pixels_DF)
         
         self.last_frame_id += 1
         self._next_track_id = self.database.shape[0]
@@ -79,11 +72,11 @@ class Tracker():
             frame1_kpts_pixels.append([kp_left_frame1.pt, kp_right_frame1.pt])
 
         incoming_kpt_pixels = pd.DataFrame()
-        incoming_kpt_pixels[0] = pd.Series(pd.arrays.SparseArray(frame0_ktps_pixels))
-        incoming_kpt_pixels[1] = pd.Series(pd.arrays.SparseArray(frame1_kpts_pixels))
+        incoming_kpt_pixels[0] = pd.Series(frame0_ktps_pixels)
+        incoming_kpt_pixels[1] = pd.Series(frame1_kpts_pixels)
         return incoming_kpt_pixels
 
-    def match(self, unmatched_pixels_DF):
+    def match(self, unmatched_pixels_DF: pd.DataFrame)->pd.DataFrame:
         """Match new frame with tracks in previous recorded frame in data base.
             check kpts ids!!
 
@@ -91,8 +84,7 @@ class Tracker():
             matches (list): kpt matches in the frame to be checked.
         
         Returns:
-            matched_idx: list of matches index in the input "matches" list
-            unmatched_idx: list of unmatched kpts in the input "matches" list
+            unmatched_pixels_DF (pandas.DataFrame): dataframe of unmatched pixels
         """
 
         
@@ -103,6 +95,7 @@ class Tracker():
         # Iterate over all active tracks from the last frame. 
         # Match them with the first frame in the new match frame pair (that is the same kpts that where active in prev frame pair, and also 
         # in the current frame pair)
+        self.database[self.last_frame_id+1] = self.database[self.last_frame_id+1].astype('object')
         for track_id in active_tracks_ids.to_list():
             track_pixels = self.database.iloc[track_id, self.last_frame_id][LEFT]
             # find if same pixels exits in the new frame pair:
@@ -114,12 +107,25 @@ class Tracker():
                 continue
             
             matched_pixels_idx = matched_pixels_idx[0][0]
-            self.database.iloc[track_id,self.last_frame_id + 1] = unmatched_pixels_DF[FRAME1][matched_pixels_idx]
+            self.database[self.last_frame_id + 1][track_id] = unmatched_pixels_DF[FRAME1][matched_pixels_idx]
 
             # drop the matched index from the unmatched_pixels_DF
-            unmatched_pixels_DF.drop(unmatched_pixels_DF.index[matched_track_idx], inplace=True, axis=0)
+            unmatched_pixels_DF.drop(unmatched_pixels_DF.index[matched_pixels_idx], inplace=True, axis=0)
+            unmatched_pixels_DF.reset_index(drop=True, inplace=True)
 
         # The remaining rows in incoming_pixels_DF are unmatched tracks:
         return unmatched_pixels_DF
 
+    def initiate_new_tracks(self, unmatched_pixels_DF):
+        """Append new tracks to the database.
+
+        Args:
+            unmatched_pixels_DF (pandas.DataFrame): dataframe of unmatched pixels
+        """
+
+        to_append = pd.DataFrame(np.full([unmatched_pixels_DF.shape[0], self.database.shape[1]], np.nan))
+        to_append.iloc[:,-2] = unmatched_pixels_DF[FRAME0]
+        to_append.iloc[:,-1] = unmatched_pixels_DF[FRAME1]
         
+        # append unmatched tracks: create new tracks in incoming frames ids:
+        self.database = self.database.append(to_append, ignore_index=True)        
