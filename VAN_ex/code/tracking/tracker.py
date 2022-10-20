@@ -61,6 +61,7 @@ class Tracker():
         
         self.last_frame_id += 1
         self._next_track_id = self.database.shape[0]
+        
 
     def convert_matches_to_DataFrame(self, kpts, matches_between_frames):
         # frame0_ktps_pixels = pd.Series().astype(pd.SparseDtype("float", np.nan))
@@ -106,6 +107,7 @@ class Tracker():
         # Iterate over all active tracks from the last frame. 
         # Match them with the first frame in the new match frame pair (that is the same kpts that where active in prev frame pair, and also 
         # in the current frame pair)
+        self.database.iloc[:, -4:]=self.database.iloc[:,-4:].sparse.to_dense()
         for track_id in active_tracks_ids.to_list():
             track_pixels = np.array(self.database.iloc[track_id][self.last_frame_id*4:self.last_frame_id*4+4]).reshape(2,2)[LEFT]
             
@@ -117,12 +119,15 @@ class Tracker():
            
             # add data of new match to database (only last frame is important)
             matched_pixels_idx = match[0]
-            self.database.iloc[track_id][-4:] = unmatched_pixels_DF.iloc[matched_pixels_idx,-4:]
-
+            self.database.iloc[track_id, -4] = unmatched_pixels_DF.iloc[matched_pixels_idx,-4]
+            self.database.iloc[track_id, -3] = unmatched_pixels_DF.iloc[matched_pixels_idx,-3]
+            self.database.iloc[track_id, -2] = unmatched_pixels_DF.iloc[matched_pixels_idx,-2]
+            self.database.iloc[track_id, -1] = unmatched_pixels_DF.iloc[matched_pixels_idx,-1]
             # drop the matched index from the unmatched_pixels_DF
             unmatched_pixels_DF.drop(unmatched_pixels_DF.index[matched_pixels_idx], inplace=True, axis=0)
             unmatched_pixels_DF.reset_index(drop=True, inplace=True)
 
+        self.database.iloc[:,-4:] = self.database.iloc[:, -4:].astype(pd.SparseDtype("float", np.nan))
         # The remaining rows in incoming_pixels_DF are unmatched tracks:
         return unmatched_pixels_DF
 
