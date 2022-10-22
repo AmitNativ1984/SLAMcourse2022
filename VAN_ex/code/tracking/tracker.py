@@ -167,3 +167,17 @@ def frames_belonging_to_track(database, track_id):
     """
     frame_ids = pd.arrays.SparseArray(database.iloc[track_id, 0:-1:4]).sp_index.indices
     return frame_ids
+
+def get_features_locations(database, track_id, frame_id):
+    """return feature locations of track TrackId on both left and right images as a triplet (xl, xr, y)
+    (xl , y) the feature location on the left image
+    (xr , y) the feature location on the right image
+    Note that the 𝑦 index is shared on both images.
+
+    Args:
+        database (pandas): database containing all frames and tracks
+        track_id (int): track id
+        frame_id (int): frame id
+    """
+    xl_yl_xr_yr = database.iloc[track_id, frame_id*4:frame_id*4+4] 
+    return (xl_yl_xr_yr[0], xl_yl_xr_yr[2], xl_yl_xr_yr[1])

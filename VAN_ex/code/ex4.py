@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from data_utils import *
 from tracking.feature_tracking import *
-from tracking.tracker import Tracker, frames_belonging_to_track, tracks_belonging_to_frame
+from tracking.tracker import Tracker, frames_belonging_to_track, tracks_belonging_to_frame, get_features_locations
 from triangulation import *
 from params import *
 import time
@@ -106,7 +106,6 @@ if __name__ == '__main__':
 
     track_ids_in_frame = tracks_belonging_to_frame(database, 0)
     frames_ids_of_track = frames_belonging_to_track(database, 0)
-    print('x')
-
+    xlxry = get_features_locations(database, 10, 0)
 
     
