@@ -138,9 +138,32 @@ class Tracker():
             unmatched_pixels_DF (pandas.DataFrame): dataframe of unmatched pixels
         """
 
-        to_append = pd.DataFrame(np.full((unmatched_pixels_DF.shape[0], unmatched_pixels_DF.shape[1]), np.nan))
-        to_append.iloc[:,:4] = unmatched_pixels_DF.iloc[:, :4]
-        to_append.iloc[:,4:] = unmatched_pixels_DF.iloc[:, 4:]
+        to_append = pd.DataFrame(np.full((unmatched_pixels_DF.shape[0], self.database.shape[1]), np.nan))
+        for col in range(-8, 0):
+            to_append[to_append.shape[1]+col] = unmatched_pixels_DF.iloc[:, col]
+        
         
         # append unmatched tracks: create new tracks in incoming frames ids:
         self.database = self.database.append(to_append, ignore_index=True)        
+
+
+def tracks_belonging_to_frame(database, frame_id):
+    """return all track ids of a given frame:
+
+    Args:
+        database (pandas): database containing all frames and tracks
+        frame_id (int): frame_id 
+    """
+
+    track_ids = pd.arrays.SparseArray(database[frame_id]).sp_index.indices
+    return track_ids
+
+def frames_belonging_to_track(database, track_id):
+    """return all frames of a given track
+
+    Args:
+        database (pandas): database containing all frames and tracks
+        track_id (int): track id
+    """
+    frame_ids = pd.arrays.SparseArray(database.iloc[track_id, 0:-1:4]).sp_index.indices
+    return frame_ids
