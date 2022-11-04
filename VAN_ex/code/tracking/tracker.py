@@ -179,5 +179,5 @@ def get_features_locations(database, track_id, frame_id):
         track_id (int): track id
         frame_id (int): frame id
     """
-    xl_yl_xr_yr = database.iloc[track_id, frame_id*4:frame_id*4+4] 
+    xl_yl_xr_yr = np.array(database.iloc[track_id, frame_id*4:frame_id*4+4])
     return (xl_yl_xr_yr[0], xl_yl_xr_yr[2], xl_yl_xr_yr[1])

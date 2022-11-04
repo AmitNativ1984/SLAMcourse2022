@@ -18,6 +18,44 @@ BUILT_DATABASE = False
 database_file_name = 'landmarksSparse'
 database_file_path = '../outputs/ex4'
 
+def mark_feature_and_cut_patch(image, x, y, patch_size):
+    """Cut a patch of size patch_size from image at position (x,y)
+
+    Args:
+        image (numpy.ndarray): image
+        x (int): x coordinate of the center of the patch
+        y (int): y coordinate of the center of the patch
+        patch_size (int): size of the patch
+
+    Returns:
+        numpy.ndarray: patch
+    """
+
+    image = cv2.circle(cv2.cvtColor(image, cv2.COLOR_GRAY2BGR), (int(x), int(y)), 2, (0, 0, 255), 2)
+
+    x0 = int(x - patch_size / 2)
+    x1 = int(x + patch_size / 2)
+    
+    y0 = int(y - patch_size / 2)
+    y1 = int(y + patch_size / 2)
+
+    if x0 < 0:
+        x0 = 0
+        x1 = patch_size + x0
+    elif x1 > image.shape[1]:
+        x1 = image.shape[1]
+        x0 = x1 - patch_size
+
+    if y0 < 0:
+        y0 = 0
+        y1 = patch_size + y0
+    elif y1 > image.shape[0]:
+        y1 = image.shape[0]
+        y0 = y1 - patch_size
+    
+    return image[y0:y1, x0:x1]
+
+
 if __name__ == '__main__':
     logger.info("\n")
     logger.info("*** START EX4 ***")
@@ -108,4 +146,37 @@ if __name__ == '__main__':
     frames_ids_of_track = frames_belonging_to_track(database, 0)
     xlxry = get_features_locations(database, 10, 0)
 
+    ###############################
+    ### 4.3 TRACK VISUALIZATION ###
+    ###############################
+
+    # pick a random track with length > 10:
+    track_id = np.random.choice(np.where(track_lengths > 10)[0])
+    logging.info("Picked track id: {}".format(track_id))   
+    logging.info("Track length: {}".format(track_lengths[track_id]))
+    logging.info("Frames ids: {}".format(frames_belonging_to_track(database, track_id)))
     
+    # cropping left and right images with patches 100x100 pixels:
+    patches = []
+    for frame_id in frames_belonging_to_track(database, track_id):
+        img1, img2 = read_image_pair(DATA_PATH, frame_id)
+        xl_xr_y = get_features_locations(database, track_id, frame_id)
+        xl = xl_xr_y[0]
+        xr = xl_xr_y[1]
+        y = xl_xr_y[2]
+        
+        left_img_patch = mark_feature_and_cut_patch(img1, xl, y, patch_size=100)
+        cv2.imshow('left_img_patch', left_img_patch)
+        right_img_patch = mark_feature_and_cut_patch(img2, xr, y, patch_size=100)
+        cv2.imshow('right_img_patch', right_img_patch)
+        cv2.waitKey(0)
+        left_right_patch = np.hstack((left_img_patch, right_img_patch))
+        patches.append(left_right_patch)
+
+    # plot patches:
+    fig, ax = plt.subplots(len(patches), 1, figsize=(20, 20))
+    for i in range(len(patches)):
+        ax[i].imshow(cv2.cvtColor(patches[i], cv2.COLOR_BGR2RGB))
+        ax[i].axis('off')
+    plt.show()
+
