@@ -158,7 +158,8 @@ if __name__ == '__main__':
     
     # cropping left and right images with patches 100x100 pixels:
     patches = []
-    for frame_id in frames_belonging_to_track(database, track_id):
+    frames = frames_belonging_to_track(database, track_id)
+    for frame_id in frames:
         img1, img2 = read_image_pair(DATA_PATH, frame_id)
         xl_xr_y = get_features_locations(database, track_id, frame_id)
         xl = xl_xr_y[0]
@@ -169,7 +170,7 @@ if __name__ == '__main__':
         cv2.imshow('left_img_patch', left_img_patch)
         right_img_patch = mark_feature_and_cut_patch(img2, xr, y, patch_size=100)
         cv2.imshow('right_img_patch', right_img_patch)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
         left_right_patch = np.hstack((left_img_patch, right_img_patch))
         patches.append(left_right_patch)
 
@@ -177,6 +178,10 @@ if __name__ == '__main__':
     fig, ax = plt.subplots(len(patches), 1, figsize=(20, 20))
     for i in range(len(patches)):
         ax[i].imshow(cv2.cvtColor(patches[i], cv2.COLOR_BGR2RGB))
+        txt = "Frame id: {}".format(frames[i])
+        ax[i].text(0,0,txt)
         ax[i].axis('off')
-    plt.show()
-
+    
+    fig.set_size_inches([5, 20])
+    fig.tight_layout()
+    plt.savefig(os.path.join(database_file_path, 'track_patches.png'))
