@@ -57,6 +57,7 @@ Here is the reprojection error for the left and right cameras:
 [![reprojection error](../outputs/ex4/track_reproj_err_from_last_frame_plot.png "reprojection error")](../outputs/ex4/track_reproj_err_from_last_frame_plot.png)
 
 As clearly seen, the reprojection error decreases towards the last frame (where the 3D world coordinates were calculated from the ground truth poses). This is due to minor tracking inaccuracies, which accumalate given there are also measurement in the ground truth poses.
+In short: small pixel matching errors in triangulation will accumlate as we move further away from the original frame.
 
 To prove this, the same graph is plotted for the first frame of the track:
 
