@@ -139,8 +139,8 @@ if __name__ == '__main__':
     logging.info("Max track length: {}".format(np.max(track_lengths)))
     logging.info("Min track length: {}".format(np.min(track_lengths)))
     
-    frame_links = np.array(database.count(axis='rows'))[0:-1:4]
-    logging.info("Average number of links per frame: {}".format(int(np.mean(frame_links))))
+    avg_frame_links = int(np.mean(np.array(database.count(axis='rows'))[0:-1:4]))
+    logging.info("Average number of links per frame: {}".format(avg_frame_links))
 
     track_ids_in_frame = tracks_belonging_to_frame(database, 0)
     frames_ids_of_track = frames_belonging_to_track(database, 0)
@@ -185,3 +185,35 @@ if __name__ == '__main__':
     fig.set_size_inches([5, 20])
     fig.tight_layout()
     plt.savefig(os.path.join(database_file_path, 'track_patches.png'))
+
+    ###############################
+    ### 4.4 CONNECTIVITY GRAPH  ###
+    ###############################
+    # for every frame, present the number of frames outgoing to the next frame
+
+    frame_links = []
+    for frame_id in range(num_frames-1):
+        cropped_db = database.iloc[:, 4*frame_id:4*(frame_id+2)]
+        num_links = cropped_db[cropped_db.count(axis='columns')==8].shape[0]
+        frame_links.append(num_links)
+        logging.info("Frame id: {} Number of links: {}".format(frame_id, num_links))
+
+    # plot frame links:
+    fig, ax = plt.subplots(1, 1, figsize=(20, 20))
+    ax.plot(frame_links)
+    ax.plot([0, len(frame_links)], [avg_frame_links, avg_frame_links], 'r--')
+    ax.set_xlabel('[#] Frame id')
+    ax.set_ylabel('[#] outgoing tracks')
+    ax.set_title('Connectivity graph')
+    plt.savefig(os.path.join(database_file_path, 'frame_links.png'))
+
+    ###############################
+    ### 4.6 TRACK LENGTH HISTO  ###
+    ###############################
+    # plot track length histogram:
+    fig, ax = plt.subplots(1, 1, figsize=(20, 20))
+    ax.hist(track_lengths, bins=list(range(0, np.max(track_lengths))))
+    ax.set_xlabel('[#] Track length')
+    ax.set_ylabel('[#] Number of tracks')
+    ax.set_title('Track length histogram')
+    plt.savefig(os.path.join(database_file_path, 'track_length_hist.png'))
