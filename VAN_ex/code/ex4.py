@@ -30,8 +30,9 @@ def mark_feature_and_cut_patch(image, x, y, patch_size):
     Returns:
         numpy.ndarray: patch
     """
-
-    image = cv2.circle(cv2.cvtColor(image, cv2.COLOR_GRAY2BGR), (int(x), int(y)), 2, (0, 0, 255), 2)
+    if len(image.shape) == 2:
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+    image = cv2.circle(image, (int(x), int(y)), 2, (0, 0, 255), 2)
 
     x0 = int(x - patch_size / 2)
     x1 = int(x + patch_size / 2)
@@ -217,3 +218,166 @@ if __name__ == '__main__':
     ax.set_ylabel('[#] Number of tracks')
     ax.set_title('Track length histogram')
     plt.savefig(os.path.join(database_file_path, 'track_length_hist.png'))
+
+    ###############################
+    ### 4.7 REPROJECTION ERROR  ###
+    ###############################
+    # GT camera matrices of frames including the picked track:
+    K, P, Q = read_cameras(DATA_PATH)
+    ground_truth_poses = read_ground_truth_camera_pose(DATA_PATH)
+    gt_poses = [ground_truth_poses[i] for i in frames]
+    
+    # dimentionality reduction matrix:
+    A = np.array([[1,0,0,0],
+                  [0,1,0,0],
+                  [0,0,1,0]])
+
+    P_ = np.vstack((P, np.array([0,0,0,1])))
+    Q_ = np.vstack((Q, np.array([0,0,0,1])))
+
+    T = gt_poses[-1]
+    T_ = np.vstack((T, np.array([0,0,0,1])))
+
+    # traingulate track on last frame in 3D world coordinates:
+    xl_xr_y = get_features_locations(database, track_id, frames[-1])    
+    xl = xl_xr_y[0]
+    xr = xl_xr_y[1]
+    y = xl_xr_y[2]
+    X_last_frame = traingulate(K@A@P_@T_, xl, y, K@A@Q_@T_, xr, y).reshape(4,1)
+    logging.info("3D point of track in last frame: {}".format(X_last_frame[:3]))
+
+    reproj_error_left_cam = []
+    reproj_error_right_cam = []
+    patches = []
+    for i, frame_id in enumerate(frames):
+        img1, img2 = read_image_pair(DATA_PATH, frame_id)
+        xl_xr_y = get_features_locations(database, track_id, frame_id)
+        xl = xl_xr_y[0]
+        xr = xl_xr_y[1]
+        y = xl_xr_y[2]
+        
+        T = gt_poses[i]
+        T_ = np.vstack((T, np.array([0,0,0,1])))
+
+        # reproject the 3D point on the image:
+        px_l_reproj = K@A@P_@T_@X_last_frame
+        xl_rep = int(px_l_reproj[0]/px_l_reproj[2])
+        yl_rep = int(px_l_reproj[1]/px_l_reproj[2])
+        img1 = cv2.cvtColor(img1, cv2.COLOR_GRAY2BGR)
+        img1 = cv2.circle(img1, (int(xl_rep), int(yl_rep)), 2, (255, 255, 0), 2)
+        left_img_patch = mark_feature_and_cut_patch(img1, xl, y, patch_size=100)
+        
+        px_r_reproj = K@A@Q_@T_@X_last_frame
+        xr_rep = int(px_r_reproj[0]/px_r_reproj[2])
+        yr_rep = int(px_r_reproj[1]/px_r_reproj[2])
+        img2 = cv2.cvtColor(img2, cv2.COLOR_GRAY2BGR)
+        img2 = cv2.circle(img2, (int(xr_rep), int(yr_rep)), 2, (255, 255, 0), 2)
+        right_img_patch = mark_feature_and_cut_patch(img2, xr, y, patch_size=100)
+
+        cv2.imshow('left_img_patch', left_img_patch)
+        cv2.imshow('right_img_patch', right_img_patch)
+        cv2.waitKey(1)
+        left_right_patch = np.hstack((left_img_patch, right_img_patch))
+        patches.append(left_right_patch)
+        
+        # calculate reprojection error:
+        reproj_error_left_cam.append(np.linalg.norm(np.array([xl, y]) - np.array([xl_rep, yl_rep])))
+        reproj_error_right_cam.append(np.linalg.norm(np.array([xr, y]) - np.array([xr_rep, yr_rep])))
+
+    # plot patches:
+    fig, ax = plt.subplots(len(patches), 1, figsize=(20, 20))
+    for i in range(len(patches)):
+        ax[i].imshow(cv2.cvtColor(patches[i], cv2.COLOR_BGR2RGB))
+        txt = "Frame id: {}".format(frames[i])
+        ax[i].text(0,0,txt)
+        ax[i].axis('off')
+    
+    fig.set_size_inches([5, 20])
+    fig.tight_layout()
+    plt.savefig(os.path.join(database_file_path, 'track_reproj_from_last_frame.png'))
+    
+    # plot reprojection error:
+    fig, ax = plt.subplots(1, 1, figsize=(20, 20))
+    ax.plot(reproj_error_left_cam, label='left camera')
+    ax.plot(reproj_error_right_cam, label='right camera')
+    ax.set_xlabel('[#] Frame id')
+    ax.set_ylabel('[px] Reprojection error')    
+    ax.set_title('Reprojection error - Last frame to first frame')
+    ax.legend()
+    plt.savefig(os.path.join(database_file_path, 'track_reproj_err_from_last_frame_plot.png'))
+        
+        
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # plot reprojection error from the first frame in the track to the last:
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    T = gt_poses[0]
+    T_ = np.vstack((T, np.array([0,0,0,1])))
+
+    # traingulate track on last frame in 3D world coordinates:
+    xl_xr_y = get_features_locations(database, track_id, frames[0])    
+    xl = xl_xr_y[0]
+    xr = xl_xr_y[1]
+    y = xl_xr_y[2]
+    X_first_frame = traingulate(K@A@P_@T_, xl, y, K@A@Q_@T_, xr, y).reshape(4,1)
+    logging.info("3D point of track in last frame: {}".format(X_first_frame[:3]))
+
+    reproj_error_left_cam = []
+    reproj_error_right_cam = []
+    patches = []
+    for i, frame_id in enumerate(frames):
+        img1, img2 = read_image_pair(DATA_PATH, frame_id)
+        xl_xr_y = get_features_locations(database, track_id, frame_id)
+        xl = xl_xr_y[0]
+        xr = xl_xr_y[1]
+        y = xl_xr_y[2]
+        
+        T = gt_poses[i]
+        T_ = np.vstack((T, np.array([0,0,0,1])))
+
+        # reproject the 3D point on the image:
+        px_l_reproj = K@A@P_@T_@X_first_frame
+        xl_rep = int(px_l_reproj[0]/px_l_reproj[2])
+        yl_rep = int(px_l_reproj[1]/px_l_reproj[2])
+        img1 = cv2.cvtColor(img1, cv2.COLOR_GRAY2BGR)
+        img1 = cv2.circle(img1, (int(xl_rep), int(yl_rep)), 2, (255, 255, 0), 2)
+        left_img_patch = mark_feature_and_cut_patch(img1, xl, y, patch_size=100)
+        
+        px_r_reproj = K@A@Q_@T_@X_first_frame
+        xr_rep = int(px_r_reproj[0]/px_r_reproj[2])
+        yr_rep = int(px_r_reproj[1]/px_r_reproj[2])
+        img2 = cv2.cvtColor(img2, cv2.COLOR_GRAY2BGR)
+        img2 = cv2.circle(img2, (int(xr_rep), int(yr_rep)), 2, (255, 255, 0), 2)
+        right_img_patch = mark_feature_and_cut_patch(img2, xr, y, patch_size=100)
+
+        cv2.imshow('left_img_patch', left_img_patch)
+        cv2.imshow('right_img_patch', right_img_patch)
+        cv2.waitKey(1)
+        left_right_patch = np.hstack((left_img_patch, right_img_patch))
+        patches.append(left_right_patch)
+        
+        # calculate reprojection error:
+        reproj_error_left_cam.append(np.linalg.norm(np.array([xl, y]) - np.array([xl_rep, yl_rep])))
+        reproj_error_right_cam.append(np.linalg.norm(np.array([xr, y]) - np.array([xr_rep, yr_rep])))
+
+    # plot patches:
+    fig, ax = plt.subplots(len(patches), 1, figsize=(20, 20))
+    for i in range(len(patches)):
+        ax[i].imshow(cv2.cvtColor(patches[i], cv2.COLOR_BGR2RGB))
+        txt = "Frame id: {}".format(frames[i])
+        ax[i].text(0,0,txt)
+        ax[i].axis('off')
+    
+    fig.set_size_inches([5, 20])
+    fig.tight_layout()
+    plt.savefig(os.path.join(database_file_path, 'track_reproj_from_first_frame.png'))
+    
+    # plot reprojection error:
+    fig, ax = plt.subplots(1, 1, figsize=(20, 20))
+    ax.plot(reproj_error_left_cam, label='left camera')
+    ax.plot(reproj_error_right_cam, label='right camera')
+    ax.set_xlabel('[#] Frame id')
+    ax.set_ylabel('[px] Reprojection error')    
+    ax.set_title('Reprojection error - First frame to last frame')
+    ax.legend()
+    plt.savefig(os.path.join(database_file_path, 'track_reproj_err_from_first_frame_plot.png'))
+        

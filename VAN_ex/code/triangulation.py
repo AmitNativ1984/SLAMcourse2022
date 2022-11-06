@@ -1,6 +1,19 @@
 import numpy as np
 import cv2
 
+def traingulate(P, px, py, Q, qx, qy):
+    A = np.array([P[2,:]*px - P[0,:],
+                      P[2,:]*py - P[1,:],
+                      Q[2,:]*qx - Q[0,:],
+                      Q[2,:]*qy - Q[1,:]])
+
+    U, S, V = np.linalg.svd(A)
+
+    x = V[-1,:]/V[-1,-1]
+
+    return x
+
+
 def linear_least_squares_triangulation(P, kp1, Q, kp2, matches):
     # P: calibration camera matrix of camera 1
     # kp1: keypoints of camera 1
@@ -18,14 +31,9 @@ def linear_least_squares_triangulation(P, kp1, Q, kp2, matches):
         kp2_pt = kp2[m.trainIdx].pt
         qx, qy = kp2_pt[0], kp2_pt[1]
         
-        A = np.array([P[2,:]*px - P[0,:],
-                      P[2,:]*py - P[1,:],
-                      Q[2,:]*qx - Q[0,:],
-                      Q[2,:]*qy - Q[1,:]])
+        x = traingulate(P, px, py, Q, qx, qy)
 
-        U, S, V = np.linalg.svd(A)
-
-        X[idx,:] = V[-1,:]/V[-1,-1]
+        X[idx,:] = x
 
     return X
 
