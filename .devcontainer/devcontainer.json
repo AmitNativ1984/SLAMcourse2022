@@ -1,5 +1,12 @@
 {
-    "image": "amitnativ/slam:opencv-matplotlib",
+    // "image": "amitnativ/slam:opencv-matplotlib",
+    "dockerFile": "Dockerfile",
+    "build": {
+        "args":{
+            "BASE_IMAGE": "amitnativ/slam:opencv-matplotlib"
+        }
+    },
+    
     "extensions":   ["streetsidesoftware.code-spell-checker",
                     "mhutchie.git-graph",
                     "ms-toolsai.jupyter",
@@ -20,6 +27,9 @@
                 "-v", "/tmp/.X11-unix:/tmp/.X11-unix",
                 "-v", "/home/${env:USER}/Dev:/home/Dev"
     ],
+    "containerEnv": {
+        "DISPLAY": "${env:DISPLAY}"
+    },
     "initializeCommand": "xhost +local:root"
        
 }
