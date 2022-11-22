@@ -23,8 +23,11 @@ def read_cameras(data_path):
     m2 = np.linalg.inv(k) @ m2
     return k, m1, m2
 
-def read_ground_truth_camera_pose(data_path):
-    poses_data_path = data_path.replace("sequences", "poses") + ".txt"
+def read_ground_truth_camera_pose(data_path, redirect_path=True):
+    if redirect_path:
+        poses_data_path = data_path.replace("sequences", "poses") + ".txt"
+    else:
+        poses_data_path = data_path
     poses = []
     with open(poses_data_path, 'r') as f:
         for line in f:
