@@ -181,6 +181,10 @@ def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_th
             best_r1 = r1
             best_t1 = t1
 
+        # breaking to increase iteration speed
+        if len(supporters_idx) >= len(matches) * 0.33 and len(supporters_idx) > 6:
+            break
+
     # Refine the transformation with the best supporters
     # This is done with iterative PnP on the supporters with thre previous transformation as initial guess
     # It actually performs DLT with the supporters to find the transformation
