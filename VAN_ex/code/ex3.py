@@ -7,6 +7,7 @@ from triangulation import *
 from params import *
 import time
 import logging
+
 logging.basicConfig(format='%(asctime)s [%(name)s] [%(funcName)s] [%(levelname)s] %(message)s', datefmt='%m/%d/%Y %I:%M:%S ', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -209,16 +210,24 @@ if __name__ == '__main__':
     good_matches = []
     point_clouds = []
  
+    lost_frames = []
+
     T_all = [np.eye(4)]
     left_cam_poses = [np.eye(4)]
-    RANSAC_iterations = 100
-    RANSAC_threshold = 2 # in pixels
+    RANSAC_iterations = 500
+    RANSAC_threshold = 3 # in pixels
 
     logger.info("* Matching key points of successive left images")
     start_time = time.time()
-    for i in range(NUM_IMAGES-1):
-        Frame0 = i
-        Frame1 = i+1
+    # updating frame 0
+    left_pose = get_camera_pose(T_all[-1])
+    left_cam_poses_txt = left_pose.astype(np.float16).flatten().tolist()
+    with open("../outputs/ex3/poses.txt", '+a') as f:
+        f.write(" ".join(map(str, left_cam_poses_txt)) + "\n")
+
+    for i in range(1, NUM_IMAGES):
+        Frame0 = i-1
+        Frame1 = i
         
         matches_frame0_frame1 = match_descriptors_knn(des[Frame0][LEFT], des[Frame1][LEFT], k=2)
         good_matches_between_frames, bad_matches_between_frames = filter_matches_by_significance_test(matches_frame0_frame1, ratio_th=0.8)
@@ -235,7 +244,7 @@ if __name__ == '__main__':
         point_clouds.append((X1[:3, :], X2[:3, :]))
 
         logger.info("Frames: {}-{}".format(Frame0, Frame1))
-        logger.info("Finding transsformation from frame {} coordinates: Running RANSAC".format(Frame0))
+        logger.info("Finding transsformation of frame {} relative to frame 0 coordinates: Running RANSAC".format(Frame1))
         try:
             T, supporters_idx = Ransac(K, P, Q, kp[Frame0:Frame1+1], good_matches[-1], point_clouds[-1], RANSAC_iterations, RANSAC_threshold)
             logger.info("Ransac result: {}".format(T))
@@ -243,13 +252,19 @@ if __name__ == '__main__':
             T_all.append(T_all[-1] @ T)
                         
             left_pose = get_camera_pose(T_all[-1])
-            left_cam_poses.append(np.vstack((left_pose,np.array([0,0,0,1]))))
-            dt = np.linalg.norm(left_cam_poses[Frame1] - left_cam_poses[Frame1-1])
+            left_cam_poses_txt = left_pose.astype(np.float16).flatten().tolist()
+            with open("../outputs/ex3/poses.txt", '+a') as f:
+                f.write(" ".join(map(str, left_cam_poses_txt)) + "\n")
+                
+            left_cam_poses.append(left_pose)
+            dt = np.linalg.norm(left_cam_poses[Frame1][:3, :] - left_cam_poses[Frame1-1][:3, :])
             
         except Exception as e:
             logger.info(e)
+            lost_frames.append(Frame1)
         except ValueError as e:
             logger.info(e)
+            lost_frames.append(Frame1)
 
     end_time = time.time()
     logger.info("*** COLLECTED {} CAMERA EXTRINSIC TRANSFORMS ***".format(len(T_all)))
@@ -258,7 +273,8 @@ if __name__ == '__main__':
     min, sec = divmod(total_exec_time, 60)
     logger.info("*** TOTAL ELAPSED TIME: %d[min] %.3f[sec]",int(min), sec)
 
-    
+    logger.info("*** LOST FRAMES: {}".format(lost_frames))
+
     xz_estimated = np.array([(pose[0,-1], pose[2,-1]) for pose in left_cam_poses[:NUM_IMAGES]])
     xz_gt = np.array([(pose[0,-1], pose[2,-1]) for pose in ground_truth_poses[:NUM_IMAGES]])
 
