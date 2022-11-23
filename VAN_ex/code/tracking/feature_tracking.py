@@ -182,7 +182,7 @@ def Ransac(K, P, Q, kp, matches, point_clouds, RANSAC_iterations=1000, RANSAC_th
             best_t1 = t1
 
         # breaking to increase iteration speed
-        if len(supporters_idx) >= len(matches) * 0.33 and len(supporters_idx) > 6:
+        if len(supporters_idx) >= len(matches) * 0.5 and len(supporters_idx) > 6:
             break
 
     # Refine the transformation with the best supporters
