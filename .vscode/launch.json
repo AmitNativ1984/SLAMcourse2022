@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "ex1",
             "type": "python",
@@ -36,7 +37,16 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/VAN_ex/code"
             // "preLaunchTask": "set PYTHONPATH"
+        },
+        {
+            "name": "ex5",
+            "type": "python",
+            "request": "launch",
+            "program": "/workspaces/SLAMcourse2022/VAN_ex/code/ex5.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/VAN_ex/code"
         }
+
         
     ]
 }
