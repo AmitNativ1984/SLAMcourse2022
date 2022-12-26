@@ -154,7 +154,7 @@ def tracks_belonging_to_frame(database, frame_id):
         database (pandas): database containing all frames and tracks
         frame_id (int): frame_id 
     """
-
+    frame_id = frame_id*4
     track_ids = pd.arrays.SparseArray(database[frame_id]).sp_index.indices
     return track_ids
 
