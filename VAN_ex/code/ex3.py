@@ -225,6 +225,9 @@ if __name__ == '__main__':
     with open("../outputs/ex3/poses.txt", '+a') as f:
         f.write(" ".join(map(str, left_cam_poses_txt)) + "\n")
 
+    with open("../outputs/ex3/pnp_relative_poses.txt", "+a") as f:
+                f.write(" ".join(map(str, T_all[0][:-1,:].astype(np.float16).flatten().tolist())) + "\n")
+
     for i in range(1, NUM_IMAGES):
         Frame0 = i-1
         Frame1 = i
@@ -253,8 +256,13 @@ if __name__ == '__main__':
                         
             left_pose = get_camera_pose(T_all[-1])
             left_cam_poses_txt = left_pose.astype(np.float16).flatten().tolist()
+            relative_pose = get_camera_pose(T[:-1,:]).astype(np.float16).flatten().tolist()
             with open("../outputs/ex3/poses.txt", '+a') as f:
                 f.write(" ".join(map(str, left_cam_poses_txt)) + "\n")
+
+            with open("../outputs/ex3/pnp_relative_poses.txt", "+a") as f:
+                f.write(" ".join(map(str, relative_pose)) + "\n")
+                
                 
             left_cam_poses.append(left_pose)
             dt = np.linalg.norm(left_cam_poses[Frame1][:3, :] - left_cam_poses[Frame1-1][:3, :])
