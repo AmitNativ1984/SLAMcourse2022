@@ -47,3 +47,10 @@ def transform_point_cloud(X, T):
     # return: transformed point cloud
     X = np.vstack((X, np.ones((1, X.shape[1]))))
     return T @ X
+
+def invert_exterinsic_matrix(T):
+    # T: transformation matrix
+    # return: inverse of T
+    R = T[:3,:3]
+    t = T[:3,3]
+    return np.hstack((R.T, -R.T @ t[:,np.newaxis]))
