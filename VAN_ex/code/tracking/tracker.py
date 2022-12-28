@@ -181,3 +181,20 @@ def get_features_locations(database, track_id, frame_id):
     """
     xl_yl_xr_yr = np.array(database.iloc[track_id, frame_id*4:frame_id*4+4])
     return (xl_yl_xr_yr[0], xl_yl_xr_yr[2], xl_yl_xr_yr[1])
+
+def get_track_features_over_all_frames(database, track_id):
+    cols_with_track = np.where(np.array(database.iloc[track_id, :] > 0))[0]
+    frames_with_track = cols_with_track[0:-1:4]// 4
+    # tranform to numpy array with all features of track id in all frames    
+    xl_yl_xr_yr = database.iloc[track_id,cols_with_track].to_numpy().reshape(-1,4)
+    
+    xl_xr_yl = {}
+    for idx, frame_id in enumerate(frames_with_track):
+        xl_xr_yl[frame_id] = np.hstack((xl_yl_xr_yr[idx,0], xl_yl_xr_yr[idx,2], xl_yl_xr_yr[idx,1]))
+
+    return xl_xr_yl
+
+def features_of_all_tracks_in_frame(database, frame_id, tracks):
+    xl_yl_xr_yr = database.iloc[tracks, frame_id*4:frame_id*4+4].to_numpy()
+    xl_xr_yl = np.hstack((xl_yl_xr_yr[:,0].reshape(-1,1), xl_yl_xr_yr[:,2].reshape(-1,1), xl_yl_xr_yr[:,1].reshape(-1,1)))
+    return xl_xr_yl

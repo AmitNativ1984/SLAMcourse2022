@@ -4,7 +4,7 @@ import numpy as np
 from data_utils import *
 from tracking.feature_tracking import *
 from params import *
-from tracking.tracker import frames_belonging_to_track, tracks_belonging_to_frame, get_features_locations
+from tracking.tracker import frames_belonging_to_track, tracks_belonging_to_frame, get_features_locations, features_of_all_tracks_in_frame
 
 import logging
 logging.basicConfig(format='%(asctime)s [%(name)s] [%(funcName)s] [%(levelname)s] %(message)s', datefmt='%m/%d/%Y %I:%M:%S ', level=logging.INFO)
@@ -83,7 +83,7 @@ def optimize_bundle_window(graph, initialEstimate, params):
     result = optimizer.optimize()
     return result
 
-def build_bundle_window_graph(key_frames, bundle_idx, pnp_poses, initial_pose, K, measurement_noise, pose_uncertainty):
+def build_bundle_window_graph(key_frames, bundle_idx, pnp_poses, initial_pose, K, measurement_noise, pose_uncertainty, database):
     # create empty graph and values:
     graph = gtsam.NonlinearFactorGraph()
     initialEstimate = gtsam.Values()
@@ -106,14 +106,14 @@ def build_bundle_window_graph(key_frames, bundle_idx, pnp_poses, initial_pose, K
         # current stereo frame:
         stereo_camera = gtsam.StereoCamera(gtsam.Pose3(cam_pose), K)
         # add initial estimate of new landmarks:
+        logging.info("Collecting all tracks and features in frame: {}".format(frame_id))
         tracks = tracks_belonging_to_frame(database, frame_id)
-        for track_id in tracks:
-            xl, xr, y = get_features_locations(database, track_id, frame_id)
-                                    
+        xl_xr_y = features_of_all_tracks_in_frame(database, frame_id, tracks)
+        for idx, track_id in enumerate(tracks):
+            xl, xr, y = xl_xr_y[idx]                                    
             if not initialEstimate.exists(symbol('l', track_id)):
                 # project the pixels in the left and right stereo frames to 3d world coordinates:
                 # by using the stereo_camera model defined above:
-                xl, xr, y = get_features_locations(database, track_id, frame_id)
                 landmark_world_point3 = stereo_camera.backproject(gtsam.StereoPoint2(xl, xr, y))
                 # For stability, reject landmarks that are two far away or behind the camera
                 if landmark_world_point3[-1] < 0 or landmark_world_point3[-1] >100 or \
@@ -192,7 +192,12 @@ if __name__ == '__main__':
     right_reproj_err = []
     for i, frame_id in enumerate(frames_with_track):
         # projecting the point from the last frame:
-        stereoPoint2 = stereo_frames[i].project(point3)        
+        try:
+            stereoPoint2 = stereo_frames[i].project(point3)        
+        except Exception as e:
+            logging.info("Failed to project point to frame: {}".format(frame_id))
+            logging.error(e)
+            continue
         xl_xr_y = get_features_locations(database, track_id, frame_id)
                 
         org_pix = np.array([xl_xr_y[0], xl_xr_y[1], xl_xr_y[2]])
@@ -394,14 +399,16 @@ if __name__ == '__main__':
     optimized_bundles = []    
     # build the graph for the first window:
     start_time = time.time()
-    for bundle_idx in range(0, 2):#len(key_frames)):    
+    for bundle_idx in range(0, len(key_frames)):    
+        logging.info("Running bundle window: {}".format(bundle_idx))
         graph, initialEstimate = build_bundle_window_graph(key_frames=key_frames, 
                                                             bundle_idx=bundle_idx, 
                                                             pnp_poses=pnp_poses, 
                                                             initial_pose=initial_pose,
                                                             K=K,
                                                             measurement_noise=measurement_noise,
-                                                            pose_uncertainty=pose_uncertainty)
+                                                            pose_uncertainty=pose_uncertainty,
+                                                            database=database)
     
         initial_bundles.append(initialEstimate)
 
@@ -412,13 +419,19 @@ if __name__ == '__main__':
         poses_values = gtsam.utilities.allPose3s(result)
         last_keyframe_pose = poses_values.atPose3(poses_values.keys()[-1])
         initial_pose = last_keyframe_pose.matrix()[:3, :]
+        
+        initial_pose_label = gtsam.LabeledSymbol(poses_values.keys()[-1])
+        logging.info("Initial pose for next bundle window is set to last pose of current window: {}{}".format(chr(initial_pose_label.chr()), initial_pose_label.index()))
 
         # saving as pickle file:
+        logging.info("Saving initial and optimized bundle windows to pickle file")
         with open(os.path.join(database_file_path, 'initial_bundles.pickle'), 'wb') as handle:
             pickle.dump(initial_bundles, handle)
 
         with open(os.path.join(database_file_path, 'optimized_bundles.pickle'), 'wb') as handle:
             pickle.dump(optimized_bundles, handle)
+        
+        logging.info("Saving complete")
         
     logging.info("Calculating all bundle windows took: {} seconds".format(time.time() - start_time))
     logging.info("DONE")
