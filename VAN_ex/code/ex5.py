@@ -436,5 +436,12 @@ if __name__ == '__main__':
     logging.info("Calculating all bundle windows took: {} seconds".format(time.time() - start_time))
     logging.info("DONE")
 
+    # plotting optimized vs initial trajectory from above:
+    for initial_bundle, optimized_bundle in zip(initial_bundles, optimized_bundles):
+        plot_trajectory_view_from_above(initial_bundle, "trajectory", fig_id='BEV trajectories', marker_color='red', label='initial estimate')
+        plot_trajectory_view_from_above(optimized_bundle, "trajectory", fig_id='BEV trajectories', marker_color='blue', label='result')
+
+    plt.legend()
+
     plt.show()
     
