@@ -409,7 +409,7 @@ if __name__ == '__main__':
     optimized_bundles = []    
 
     start_time = time.time()
-    for bundle_idx in range(0, len(key_frames)):    
+    for bundle_idx in range(0, len(key_frames)-1):    
         logging.info("Running bundle window: {}".format(bundle_idx))
         graph, initialEstimate = build_bundle_window_graph(key_frames=key_frames, 
                                                             bundle_idx=bundle_idx, 
@@ -446,6 +446,16 @@ if __name__ == '__main__':
     logging.info("Calculating all bundle windows took: {} seconds".format(time.time() - start_time))
     logging.info("DONE")
 
+    cam_pose = np.eye(4)[:3, :]
+    initial_trajectory = []
+    for bundle_idx in range(0, len(key_frames)-1):    
+        for frame_id in list(range(key_frames[bundle_idx], key_frames[bundle_idx+1] + 1)):
+            T = pnp_poses[frame_id]
+            T = np.vstack((T, np.array([0, 0, 0, 1])))
+            cam_pose = np.vstack((cam_pose, np.array([0, 0, 0, 1]))) @ T
+            cam_pose = cam_pose[:3, :]
+            initial_trajectory.append(cam_pose)
+    
     # plotting optimized vs initial trajectory from above:
     for initial_bundle, optimized_bundle in zip(initial_bundles, optimized_bundles):
         plot_trajectory_view_from_above(initial_bundle, "trajectory", fig_id='BEV trajectories', marker_color='red', label='initial estimate')
