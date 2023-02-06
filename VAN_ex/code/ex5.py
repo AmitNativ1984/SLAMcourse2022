@@ -109,17 +109,26 @@ def build_bundle_window_graph(key_frames, bundle_idx, pnp_poses, initial_pose, K
         logging.info("Collecting all tracks and features in frame: {}".format(frame_id))
         tracks = tracks_belonging_to_frame(database, frame_id)
         xl_xr_y = features_of_all_tracks_in_frame(database, frame_id, tracks)
+        R = stereo_camera.pose().rotation()
+        t = stereo_camera.pose().translation()
+        M = np.hstack((R.transpose(), -R.transpose()@t.reshape(-1,1)))
         for idx, track_id in enumerate(tracks):
             xl, xr, y = xl_xr_y[idx]                                    
+            landmark_world_point3 = stereo_camera.backproject(gtsam.StereoPoint2(xl, xr, y))
+
+            landmark_rel_point3 = M @ np.hstack((landmark_world_point3, 1)).reshape((-1,1))
+            
+            if landmark_rel_point3[-1] < 0 or landmark_rel_point3[-1] >100 or \
+               np.isnan(landmark_world_point3).any() or \
+               np.isinf(landmark_world_point3).any():
+               continue
+               
+
+
             if not initialEstimate.exists(symbol('l', track_id)):
                 # project the pixels in the left and right stereo frames to 3d world coordinates:
                 # by using the stereo_camera model defined above:
-                landmark_world_point3 = stereo_camera.backproject(gtsam.StereoPoint2(xl, xr, y))
                 # For stability, reject landmarks that are two far away or behind the camera
-                if landmark_world_point3[-1] < 0 or landmark_world_point3[-1] >100 or \
-                    np.isnan(landmark_world_point3).any() or \
-                    np.isinf(landmark_world_point3).any():
-                    continue
                 initialEstimate.insert(symbol('l', track_id), landmark_world_point3)
                 logging.info('Adding new landmark to graph: l{} at world coordinates: {}'.format(track_id, landmark_world_point3))
 
@@ -129,6 +138,7 @@ def build_bundle_window_graph(key_frames, bundle_idx, pnp_poses, initial_pose, K
                                                     symbol('l', track_id), 
                                                     K)
             )
+            logging.info("Added factor between camera pose: c{} and landmark: l{}".format(frame_id, track_id))
                 
     # adding constraint to first frame:
     # graph.add(gtsam.PriorFactorPose3(symbol('c', key_frames[bundle_idx]), initialEstimate.atPose3(symbol('c', key_frames[bundle_idx])), pose_uncertainty))
@@ -397,7 +407,7 @@ if __name__ == '__main__':
     
     initial_bundles = []
     optimized_bundles = []    
-    # build the graph for the first window:
+
     start_time = time.time()
     for bundle_idx in range(0, len(key_frames)):    
         logging.info("Running bundle window: {}".format(bundle_idx))
